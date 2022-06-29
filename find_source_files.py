@@ -6,10 +6,11 @@ import zipfile
 import os
 import shutil
 import itertools
+import filehash
 from pathlib import Path
 # Go through none directory
 
-DATASET_DIR = '/data2/pypi'
+DATASET_DIR = '/Users/logancheng/Downloads/RESULT'#'/data2/pypi'
 
 def iterate(directory):
     
@@ -35,6 +36,10 @@ def is_extractable(filename: str) -> bool:
         if filename.endswith('/setup.py'):
             return False
         return True
+
+def hash_file(filepath):
+    sha512hasher = filehash.FileHash('sha512')
+    return sha512hasher.hash_file(filepath)
 
 def flatten(destination):
     all_files = []
@@ -62,7 +67,7 @@ def unzip(filename, file_directory, destination):
     
         for index, file in enumerate(extractable_files):
             filename = Path(file).name
-            new_dir = Path(destination + f'_{index}')
+            new_dir = Path(destination).with_name(hash_file(file))
             os.makedirs(new_dir, exist_ok=True)
             new_location = new_dir.joinpath(filename)
             shutil.move(file, new_location)
@@ -79,15 +84,27 @@ def whl_func(filename, cwd, destination):
 
 # extracts tar files
 def tar_func(filename, cwd, destination):
-    
-    filepath = os.path.join(cwd, filename)
-    with tarfile.open(filepath) as file:
-        extractable_members = (member for member in file.getmembers() if member.isfile() and is_extractable(member.name))
-        for index, member in enumerate(extractable_members):
-            member_destination = Path(destination + f'_{index}')
-            os.makedirs(member_destination, exist_ok=True)
-            file.extract(member, member_destination)
-            flatten(member_destination)
+    with tempfile.TemporaryDirectory() as tempdir:
+        filepath = os.path.join(cwd, filename)
+        tar = tarfile.open(filepath)
+        tar.extractall(tempdir)
+        extractable_files = []
+        for subdir, _, files in os.walk(tempdir):
+            extractable_files.extend(os.path.join(subdir, file) for file in files if is_extractable(file))
+        for index, file in enumerate(extractable_files):
+            filename = Path(file).name
+            new_dir = Path(destination).with_name(hash_file(file))
+            os.makedirs(new_dir, exist_ok=True)
+            new_location = new_dir.joinpath(filename)
+            shutil.move(file, new_location)
+            flatten(new_dir)
+    # with tarfile.open(filepath) as file:
+    #     extractable_members = (member for member in file.getmembers() if member.isfile() and is_extractable(member.name))
+    #     for index, member in enumerate(extractable_members):
+    #         member_destination = Path(destination).with_name(hash_file())
+    #         os.makedirs(member_destination, exist_ok=True)
+    #         file.extract(member, member_destination)
+    #         flatten(member_destination)
 
 if __name__ == '__main__':
     directory = os.getcwd()
