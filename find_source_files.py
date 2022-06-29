@@ -9,7 +9,7 @@ import itertools
 from pathlib import Path
 # Go through none directory
 
-DATASET_DIR = '/Users/logancheng/Downloads/RESULT' #'/data2/pypi'
+DATASET_DIR = '/data2/pypi'
 
 def iterate(directory):
     
