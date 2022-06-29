@@ -65,7 +65,7 @@ def unzip(filename, file_directory, destination):
             new_dir = Path(destination + f'_{index}')
             os.makedirs(new_dir, exist_ok=True)
             new_location = new_dir.joinpath(filename)
-            os.replace(file, new_location)
+            shutil.move(file, new_location)
             flatten(new_dir)
 
 
