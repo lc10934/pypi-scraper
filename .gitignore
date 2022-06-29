@@ -1,2 +1,10 @@
 source/
 venv/
+destination/
+None/
+whl_files/
+egg_files/
+tar_files/
+python_sources/
+*.zip
+.DS_Store

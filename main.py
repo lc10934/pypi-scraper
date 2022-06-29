@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import argparse
 import feedparser
 import requests
@@ -12,11 +13,17 @@ from datetime import timedelta
 def get_latest_release(project, release):
     url = f"https://pypi.org/pypi/{project}/{release}/json"
     r = requests.get(url)
-    download = r.json()["releases"][release][-1]["url"]
+    release_entry = r.json()["releases"][release]
+    if not release_entry:
+        return None
+    download = release_entry[-1]["url"]
     return download
 
 
 def parse_feed(url):
+    import ssl
+    if hasattr(ssl, '_create_unverified_context'):
+        ssl._create_default_https_context = ssl._create_unverified_context
     feed = feedparser.parse(url)
     downloads = []
     print(f"Parsing {len(feed.entries)} entries")
@@ -25,7 +32,8 @@ def parse_feed(url):
         name = base_link.split('/')[-3]
         release = base_link.split('/')[-2]
         download = get_latest_release(name, release)
-        downloads.append(download)
+        if download is not None:
+            downloads.append(download)
     return downloads
 
 
