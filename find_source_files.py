@@ -1,7 +1,9 @@
 #!/usr/bin/python3
+from fileinput import filename
 import sys
 import tarfile
 import tempfile
+from typing import Callable
 import zipfile
 import os
 import shutil
@@ -12,19 +14,18 @@ from pathlib import Path
 
 DATASET_DIR = '/Users/logancheng/Downloads/RESULT'#'/data2/pypi'
 
-def iterate(directory):
-    
+def iterate(directory: str) -> None:
     for subdir, dirs, files in os.walk(directory):
         destination = os.path.join(DATASET_DIR, Path(subdir).parts[-1])
         for file in files:
             if file.endswith('.tar.gz'):
-                tar_func(file, subdir, destination)
+                extract(file, subdir, destination, tar_extractor_strategy)
             elif file.endswith('.egg'):
-                egg_func(file, subdir, destination)
+                extract(file, subdir, destination, unzip_strategy)
             elif file.endswith('.whl'):
-                whl_func(file, subdir, destination)
+                extract(file, subdir, destination, unzip_strategy)
             elif file.endswith('.zip'):
-                unzip(file, subdir, destination)
+                extract(file, subdir, destination, unzip_strategy)
             else:
                 print(f'[UNCATEGORIZED] {file}')
 
@@ -37,11 +38,11 @@ def is_extractable(filename: str) -> bool:
             return False
         return True
 
-def hash_file(filepath):
+def hash_file(filepath: str) -> str:
     sha512hasher = filehash.FileHash('sha512')
     return sha512hasher.hash_file(filepath)
 
-def flatten(destination):
+def flatten(destination: str) -> None:
     all_files = []
     for root, _dirs, files in itertools.islice(os.walk(destination), 1, None):
         for filename in files:
@@ -55,56 +56,29 @@ def flatten(destination):
             shutil.rmtree(path)
 
 # Does egg and whl files
-def unzip(filename, file_directory, destination):
-    with tempfile.TemporaryDirectory() as tempdir:
-        path_to_file = os.path.join(file_directory, filename)
-        with zipfile.ZipFile(path_to_file, 'r') as file:
-            file.extractall(tempdir)
-        
-        extractable_files = []
-        for subdir, _, files in os.walk(tempdir):
-            extractable_files.extend(os.path.join(subdir, file) for file in files if is_extractable(file))
-    
-        for index, file in enumerate(extractable_files):
-            filename = Path(file).name
-            new_dir = Path(destination).with_name(hash_file(file))
-            os.makedirs(new_dir, exist_ok=True)
-            new_location = new_dir.joinpath(filename)
-            shutil.move(file, new_location)
-            flatten(new_dir)
-
-
-# extracts egg files
-def egg_func(filename, cwd, destination):
-    unzip(filename, cwd, destination)
-
-# extracts whl files
-def whl_func(filename, cwd, destination):
-    unzip(filename, cwd, destination)
+def unzip_strategy(filepath: str, destination: str) -> None:
+    with zipfile.ZipFile(filepath, 'r') as file:
+            file.extractall(destination)
 
 # extracts tar files
-def tar_func(filename, cwd, destination):
+def tar_extractor_strategy(filepath: str, destination: str) -> None:
+    tar = tarfile.open(filepath)
+    tar.extractall(destination)
+
+def extract(filename: str, file_directory: str, destination: str, extractor_strategy: Callable[[str, str], None]) -> None:
     with tempfile.TemporaryDirectory() as tempdir:
-        filepath = os.path.join(cwd, filename)
-        tar = tarfile.open(filepath)
-        tar.extractall(tempdir)
-        extractable_files = []
+        filepath = os.path.join(file_directory, filename)
+        extractor_strategy(filepath, tempdir)
         for subdir, _, files in os.walk(tempdir):
-            extractable_files.extend(os.path.join(subdir, file) for file in files if is_extractable(file))
-        for index, file in enumerate(extractable_files):
-            filename = Path(file).name
-            new_dir = Path(destination).with_name(hash_file(file))
-            os.makedirs(new_dir, exist_ok=True)
-            new_location = new_dir.joinpath(filename)
-            shutil.move(file, new_location)
-            flatten(new_dir)
-    # with tarfile.open(filepath) as file:
-    #     extractable_members = (member for member in file.getmembers() if member.isfile() and is_extractable(member.name))
-    #     for index, member in enumerate(extractable_members):
-    #         member_destination = Path(destination).with_name(hash_file())
-    #         os.makedirs(member_destination, exist_ok=True)
-    #         file.extract(member, member_destination)
-    #         flatten(member_destination)
+            for file in map(lambda name: os.path.join(subdir, name), files):
+                if not is_extractable(file):
+                    continue
+                filename = Path(file).name
+                new_dir = Path(destination).with_name(hash_file(file))
+                os.makedirs(new_dir, exist_ok=True)
+                new_location = new_dir.joinpath(filename)
+                shutil.move(file, new_location)
+                flatten(new_dir)
 
 if __name__ == '__main__':
     directory = os.getcwd()
