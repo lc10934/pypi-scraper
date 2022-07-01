@@ -3,6 +3,7 @@ import argparse
 import feedparser
 import requests
 import os
+import sys
 from tqdm import tqdm
 from ratelimit import limits, sleep_and_retry
 from datetime import timedelta
@@ -13,12 +14,15 @@ from datetime import timedelta
 def get_latest_release(project, release):
     url = f"https://pypi.org/pypi/{project}/{release}/json"
     r = requests.get(url)
-    release_entry = r.json()["releases"][release]
-    if not release_entry:
+    try:
+        release_entry = r.json()["releases"][release]
+        if not release_entry:
+            return None
+        download = release_entry[-1]["url"]
+        return download
+    except KeyError as err:
+        print(f'KeyError in get_latest_release({project}, {release}): {err}', file=sys.stderr)
         return None
-    download = release_entry[-1]["url"]
-    return download
-
 
 def parse_feed(url):
     import ssl
