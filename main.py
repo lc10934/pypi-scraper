@@ -5,7 +5,6 @@ import feedparser
 import requests
 import os
 import sys
-from soupsieve import match
 from tqdm import tqdm
 from ratelimit import limits, sleep_and_retry
 from datetime import timedelta
