@@ -1,24 +1,34 @@
 #!/usr/bin/python3
 import argparse
+from turtle import down
 import feedparser
 import requests
 import os
+import sys
+from soupsieve import match
 from tqdm import tqdm
 from ratelimit import limits, sleep_and_retry
 from datetime import timedelta
-
+import re
 
 @sleep_and_retry
 @limits(calls=100, period=timedelta(seconds=60).total_seconds())
 def get_latest_release(project, release):
     url = f"https://pypi.org/pypi/{project}/{release}/json"
     r = requests.get(url)
-    release_entry = r.json()["releases"][release]
-    if not release_entry:
-        return None
-    download = release_entry[-1]["url"]
-    return download
 
+    if not r.ok:
+        print(f'Web request failed in get_latest_release({project}, {release}): {r.status_code}', file=sys.stderr)
+        return None
+
+    file_url_regex = r"https://files\.pythonhosted\.org/[^\"]*(?:\.tar\.gz|\.whl|\.zip|\.egg)"
+    matches = re.findall(file_url_regex, r.text)
+
+    if not matches:
+        print(f'No file URL found by regex in get_latest_release({project}, {release})', file=sys.stderr)
+        return None
+
+    return matches[-1]
 
 def parse_feed(url):
     import ssl
